@@ -9,31 +9,34 @@ import scorex.core.utils.ScorexLogging
 import scala.collection.mutable
 import scala.io.StdIn
 
-case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryAppSettings) extends Actor with ScorexLogging {
+case class ConsolePromptListener(actors: mutable.HashMap[String, ActorRef],
+                                 nodeViewHolderRef: ActorRef,
+                                 settings: EncryAppSettings) extends Actor with ScorexLogging {
 
   val prompt = "$> "
 
-  val commands: mutable.HashMap[String,mutable.HashMap[String, Command]] = mutable.HashMap.empty
+  val commands: mutable.HashMap[String,mutable.HashMap[String, (Command, ActorRef)]] = mutable.HashMap.empty
 
   commands.update("node", mutable.HashMap(
-    "-shutdown" -> NodeShutdown
+    "-shutdown" -> (NodeShutdown, actorRef("NodeViewHolderRef")),
+    "-reboot" -> (NodeReboot, actorRef("NodeViewHolderRef"))
   ))
 
   commands.update("app", mutable.HashMap(
-    "-help" -> Help
+    "-help" -> (Help, actorRef("NodeViewHolderRef"))
   ))
 
   commands.update("pki", mutable.HashMap(
-    "-addPubKeyInfo" -> AddPubKeyInfo
+    "-addPubKeyInfo" -> (AddPubKeyInfo, actorRef("NodeViewHolderRef"))
   ))
 
   commands.update("wallet", mutable.HashMap(
-    "-addrs" -> PrintMyAddrs,
-    "-addKey" -> AddKey,
-    "-init" -> InitKeyStorage,
-    "-pubKeys" -> PrintPubKeys,
-    "-balance" -> GetBalance,
-    "-transfer" -> Transfer
+    "-addrs" -> (PrintMyAddrs, actorRef("NodeViewHolderRef")),
+    "-addKey" -> (AddKey, actorRef("NodeViewHolderRef")),
+    "-init" -> (InitKeyStorage, actorRef("NodeViewHolderRef")),
+    "-pubKeys" -> (PrintPubKeys, actorRef("NodeViewHolderRef")),
+    "-balance" -> (GetBalance, actorRef("NodeViewHolderRef")),
+    "-transfer" -> (Transfer, actorRef("NodeViewHolderRef"))
   ))
 
   override def receive: Receive = {
@@ -45,7 +48,7 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
             parseCommand(input).slice(1, parseCommand(input).length).foreach { command =>
               value.get(command.split("=").head) match {
                 case Some(cmd) =>
-                  println(cmd.execute(nodeViewHolderRef, command.split("="), settings).map(_.msg).getOrElse(""))
+                  println(cmd._1.execute(cmd._2, command.split("="), settings).map(_.msg).getOrElse(""))
                 case None =>
                   println("Unsupported command. Type 'app -help' to get commands list")
               }
@@ -60,6 +63,8 @@ case class ConsolePromptListener(nodeViewHolderRef: ActorRef, settings: EncryApp
     val commandsSeq = command.split(" ").toSeq
     commandsSeq
   }
+
+  private def actorRef(actorName: String): ActorRef = actors.getOrElse(actorName, nodeViewHolderRef)
 
 }
 

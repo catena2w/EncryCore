@@ -1,7 +1,7 @@
 package encry
 
 import akka.actor.{ActorRef, Props}
-import encry.api.http.routes.{HistoryApiRoute, InfoApiRoute, AccountInfoApiRoute, TransactionsApiRoute}
+import encry.api.http.routes.{AccountInfoApiRoute, HistoryApiRoute, InfoApiRoute, TransactionsApiRoute}
 import encry.cli.ConsolePromptListener
 import encry.cli.ConsolePromptListener.StartListening
 import encry.local.TransactionGenerator.StartGeneration
@@ -20,6 +20,7 @@ import scorex.core.network.message.MessageSpec
 import scorex.core.settings.ScorexSettings
 import scorex.core.transaction.box.proposition.Proposition
 
+import scala.collection.mutable
 import scala.concurrent.ExecutionContextExecutor
 import scala.io.Source
 
@@ -77,8 +78,13 @@ class EncryApp(args: Seq[String]) extends Application {
     txGen ! StartGeneration
   }
 
+  val actors: mutable.HashMap[String, ActorRef] = mutable.HashMap(
+    "NodeViewHolderRef" -> nodeViewHolderRef,
+    "MinerRef" -> minerRef
+  )
+
   val cliListenerRef: ActorRef =
-    actorSystem.actorOf(Props(classOf[ConsolePromptListener], nodeViewHolderRef, encrySettings))
+    actorSystem.actorOf(Props(classOf[ConsolePromptListener], actors, nodeViewHolderRef, encrySettings))
   cliListenerRef ! StartListening
 }
 
